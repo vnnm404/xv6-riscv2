@@ -101,7 +101,10 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_link(void);
 extern uint64 sys_mkdir(void);
 extern uint64 sys_close(void);
+// Specification 1
 extern uint64 sys_trace(void);
+extern uint64 sys_sigalarm(void);
+extern uint64 sys_sigreturn(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -127,7 +130,9 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
-[SYS_trace]   sys_trace,
+[SYS_trace]   sys_trace, //Specification 1
+[SYS_sigalarm]   sys_sigalarm,
+[SYS_sigreturn]  sys_sigreturn,
 };
 
 static char *syscall_names[] = {
@@ -152,7 +157,9 @@ static char *syscall_names[] = {
   [SYS_link]    "link",
   [SYS_mkdir]   "mkdir",
   [SYS_close]   "close",
-  [SYS_trace]   "trace",
+  [SYS_trace]   "trace", // Specification 1
+  [SYS_sigalarm]   "sigalarm",
+  [SYS_sigreturn]  "sigreturn",
 };
 
 static int syscall_nargs[] = {
@@ -177,7 +184,9 @@ static int syscall_nargs[] = {
   [SYS_link]    2,
   [SYS_mkdir]   1,
   [SYS_close]   1,
-  [SYS_trace]   1,
+  [SYS_trace]   1, // Specification 1
+  [SYS_sigalarm]   2,
+  [SYS_sigreturn]   0,
 };
 
 void
@@ -200,10 +209,11 @@ syscall(void)
     p->trapframe->a0 = syscalls[num]();
 
     // if trace was called
+    // Specification 1        
     int trace_call = p->smask & (1 << num);
-    if (trace_call) {
+    if (trace_call) { 
       printf("%d: syscall %s (", p->pid, syscall_names[num]);
-      for (int i = 0; i < nargs; i++) {
+      for (int i = 0; i < nargs; i++) { 
         printf("%d", args[i]);
         if (i != nargs - 1)
           printf(" ");
@@ -215,7 +225,7 @@ syscall(void)
     if (trace_call) {
       printf("-> %d\n", p->trapframe->a0);
     }
-  } else {
+  } else {         
     printf("%d %s: unknown sys call %d\n",
             p->pid, p->name, num);
     p->trapframe->a0 = -1;

@@ -105,6 +105,14 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
+  // Specification 1
   // trace system calls used by the process
   int smask;
+
+  // sigalarm system call fields
+  int interval;
+  uint64 handler;
+  int nticks;
+  int alarmOn;
+  struct trapframe * alarmContext;
 };

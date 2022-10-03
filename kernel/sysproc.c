@@ -90,6 +90,8 @@ sys_uptime(void)
   return xticks;
 }
 
+// Specification 1
+
 uint64
 sys_trace(void) {
   int mask;
@@ -100,4 +102,37 @@ sys_trace(void) {
 
   p->smask = mask;
   return 0;
+}
+
+uint64 sys_sigalarm(void){
+  struct proc * p;
+  p =myproc();
+
+  int interval;
+  uint64 handler;
+
+  argint(0,&interval);
+  argaddr(1,&handler);
+
+  p->interval = interval;
+  p->handler = handler;
+
+  return 0;
+  
+}
+
+uint64 sys_sigreturn(void){
+
+  struct proc * p;
+  p =myproc();
+
+  memmove(p->trapframe,p->alarmContext,PGSIZE);
+  int a0 = p->alarmContext->a0;
+  kfree(p->alarmContext);
+  p->alarmOn=0;
+  p->nticks=0;
+  p->alarmContext=0;
+  // this is done to restore the original value of the a0 register
+  // as sys_sigreturn is also a systemcall its return value will be stored in the a0 register
+  return a0;
 }
