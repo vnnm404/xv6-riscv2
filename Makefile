@@ -132,7 +132,6 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
-	$U/_vnnm\
 	$U/_strace\
 
 fs.img: mkfs/mkfs README $(UPROGS)
