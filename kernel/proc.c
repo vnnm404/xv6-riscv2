@@ -111,6 +111,9 @@ allocproc(void)
 {
   struct proc *p;
 
+  //Specification 1
+  
+
   for(p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
     if(p->state == UNUSED) {
@@ -124,6 +127,9 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  // Specification 1
+  p->nticks =0;
+  p->alarmOn =0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -169,7 +175,12 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+
+  // Specification 1
   p->smask = 0;
+  p->interval = 0;
+  p->nticks =0;
+  p->handler = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -324,6 +335,7 @@ fork(void)
   release(&np->lock);
 
   // child process should get the same mask as the parent process
+  // Specification 1
   np->smask = p->smask;
 
   return pid;
@@ -681,6 +693,7 @@ procdump(void)
       state = states[p->state];
     else
       state = "???";
+    // Specification 1
     printf("%d %s %s %d", p->pid, state, p->name, p->smask);
     printf("\n");
   }

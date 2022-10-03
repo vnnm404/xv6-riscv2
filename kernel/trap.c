@@ -67,6 +67,19 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+    // Specification 1
+    if(which_dev==2 && p->alarmOn==0){
+      // this is to check whether the interrupt was from the timer(look at the devintr() function on line 181)
+      p->nticks += 1;
+      
+      if(p->nticks==p->interval){
+        struct trapframe *context = kalloc();
+        memmove(context,p->trapframe,PGSIZE);
+        p->alarmContext = context;
+        p->alarmOn =1; // done to prevent reentrance (test 2)
+        p->trapframe->epc = p->handler;
+      }
+    }
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
