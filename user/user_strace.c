@@ -4,7 +4,7 @@
 
 int 
 main(void) {
-  trace(2147483647);
+  trace(32);
   printf("Hello, world\n");
   exit(0);
 }
