@@ -12,7 +12,7 @@ sys_exit(void)
   int n;
   argint(0, &n);
   exit(n);
-  return 0;  // not reached
+  return 0; // not reached
 }
 
 uint64
@@ -43,7 +43,7 @@ sys_sbrk(void)
 
   argint(0, &n);
   addr = myproc()->sz;
-  if(growproc(n) < 0)
+  if (growproc(n) < 0)
     return -1;
   return addr;
 }
@@ -57,8 +57,10 @@ sys_sleep(void)
   argint(0, &n);
   acquire(&tickslock);
   ticks0 = ticks;
-  while(ticks - ticks0 < n){
-    if(killed(myproc())){
+  while (ticks - ticks0 < n)
+  {
+    if (killed(myproc()))
+    {
       release(&tickslock);
       return -1;
     }
@@ -93,7 +95,8 @@ sys_uptime(void)
 // Specification 1
 
 uint64
-sys_trace(void) {
+sys_trace(void)
+{
   int mask;
   struct proc *p;
 
@@ -104,34 +107,34 @@ sys_trace(void) {
   return 0;
 }
 
-uint64 sys_sigalarm(void){
-  struct proc * p;
-  p =myproc();
+uint64 sys_sigalarm(void)
+{
+  struct proc *p;
+  p = myproc();
 
   int interval;
   uint64 handler;
 
-  argint(0,&interval);
-  argaddr(1,&handler);
+  argint(0, &interval);
+  argaddr(1, &handler);
 
   p->interval = interval;
   p->handler = handler;
 
   return 0;
-  
 }
 
-uint64 sys_sigreturn(void){
+uint64 sys_sigreturn(void)
+{
+  struct proc *p;
+  p = myproc();
 
-  struct proc * p;
-  p =myproc();
-
-  memmove(p->trapframe,p->alarmContext,PGSIZE);
+  memmove(p->trapframe, p->alarmContext, PGSIZE);
   int a0 = p->alarmContext->a0;
   kfree(p->alarmContext);
-  p->alarmOn=0;
-  p->nticks=0;
-  p->alarmContext=0;
+  p->alarmOn = 0;
+  p->nticks = 0;
+  p->alarmContext = 0;
   // this is done to restore the original value of the a0 register
   // as sys_sigreturn is also a systemcall its return value will be stored in the a0 register
   return a0;
