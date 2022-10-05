@@ -67,6 +67,38 @@ void usertrap(void)
   else if (r_scause() == 0xf) // 0xf is a pagefault trap (like writing to read only PTEs)
   {
     // Specification 3(COW)
+    // we now allocate this page to the child process
+    // and we then set the PTE_W bit
+    uint64 err_va, n_va;
+    pte_t *pte;
+    uint flags;
+    char *mem;
+
+    err_va = r_stval();
+    n_va = PGROUNDDOWN(err_va); // nearest page
+    pte = walk(p->pagetable, n_va, 0);
+    flags = PTE_FLAGS(*pte);
+
+    if ((flags & PTE_V) && (flags & PTE_COW) && (flags & PTE_U)) {
+      if (get_access((void*)err_va) == 1) {
+        *pte = (*pte & (~PTE_COW)) | PTE_W;
+      } else {
+        flags |= PTE_W;
+        flags &= ~PTE_COW;
+      
+        if((mem = kalloc()) == 0)
+          exit(-1);
+        memmove(mem, (char *)PTE2PA(*pte), PGSIZE);
+
+        uvmunmap(p->pagetable, n_va, 1, 1);
+        // decrement access
+        if (mappages(p->pagetable, n_va, PGSIZE, (uint64)mem, flags) != 0) {
+          exit(-1);
+        }
+      }
+    } else {
+      setkilled(p);
+    }
   }
   else if ((which_dev = devintr()) != 0)
   {

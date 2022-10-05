@@ -9,6 +9,9 @@
 #include "riscv.h"
 #include "defs.h"
 
+#define MAXPA   (1 << 15)
+int access_count[MAXPA];
+
 void freerange(void *pa_start, void *pa_end);
 
 extern char end[]; // first address after kernel.
@@ -23,11 +26,22 @@ struct {
   struct run *freelist;
 } kmem;
 
+int pa_ind(void *pa) {
+  return PGROUNDDOWN((uint64)pa) / PGSIZE;
+}
+
+void inc_access(void *addr) {
+  acquire(&kmem.lock);
+  access_count[pa_ind(addr)]++;
+  release(&kmem.lock);
+}
+
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
+  memset(access_count, 0, MAXPA);
 }
 
 void
@@ -62,6 +76,21 @@ kfree(void *pa)
   release(&kmem.lock);
 }
 
+// S3(COW)
+void dec_access(void *addr) {
+  acquire(&kmem.lock);
+  int ind = pa_ind(addr);
+  if (access_count[ind] == 0) {
+    panic("dec_access: already freed");
+  }
+  access_count[ind]--;
+  if (access_count[ind] == 0) {
+    printf("Should work\n");
+    kfree(addr);
+  }
+  release(&kmem.lock);
+}
+
 // Allocate one 4096-byte page of physical memory.
 // Returns a pointer that the kernel can use.
 // Returns 0 if the memory cannot be allocated.
@@ -78,5 +107,11 @@ kalloc(void)
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
+
+  inc_access(r);
   return (void*)r;
+}
+
+int get_access(void *addr) {
+  return access_count[pa_ind(addr)];
 }
