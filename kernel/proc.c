@@ -127,9 +127,13 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  
   // Specification 1
   p->nticks =0;
   p->alarmOn =0;
+
+  // Specification 2.  
+  p->ctime = ticks; // 'ticks' is an inbuilt unit in xv6
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){

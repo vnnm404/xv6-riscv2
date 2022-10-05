@@ -115,4 +115,9 @@ struct proc {
   int nticks;
   int alarmOn;
   struct trapframe * alarmContext;
+
+  // for fcfs scheduling
+  //Specification 2
+
+  int ctime;
 };

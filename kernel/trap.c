@@ -64,6 +64,7 @@ void usertrap(void)
 
     syscall();
   }
+
   else if (r_scause() == 0xf) // 0xf is a pagefault trap (like writing to read only PTEs)
   {
     // Specification 3(COW)
@@ -100,6 +101,7 @@ void usertrap(void)
       setkilled(p);
     }
   }
+
   else if ((which_dev = devintr()) != 0)
   {
     // ok
