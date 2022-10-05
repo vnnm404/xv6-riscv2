@@ -2987,7 +2987,7 @@ runtests(struct test *tests, char *justone) {
 int
 countfree()
 {
-  int fds[2];
+  int fds[2] = {0, 1};
 
   if(pipe(fds) < 0){
     printf("pipe() failed in countfree()\n");
@@ -3033,8 +3033,10 @@ countfree()
       printf("read() failed in countfree()\n");
       exit(1);
     }
-    if(cc == 0)
+    if(cc == 0) {
+      printf("HERE\n");
       break;
+    }
     n += 1;
   }
 
