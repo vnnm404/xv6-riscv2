@@ -51,17 +51,7 @@ endif
 # For scheduling 
 # Specification 2
 
-SCHEDULER = -D RR
-
-ifeq ($(SCHEDULER),FCFS)
-SCHEDULER = -D FCFS
-endif
-ifeq ($(SCHEDULER),PBS)
-SCHEDULER = -D PBS
-endif
-ifeq ($(SCHEDULER),MLFQ)
-SCHEDULER = -D MLFQ
-endif
+SCHEDULER = RR
 
 QEMU = qemu-system-riscv64
 
@@ -80,7 +70,7 @@ CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 &
 
 # For scheduling 
 # Specification 2
-CFLAGS += $(SCHEDULER)
+CFLAGS += -D $(SCHEDULER)
 
 # Disable PIE when possible (for Ubuntu 16.10 toolchain)
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)

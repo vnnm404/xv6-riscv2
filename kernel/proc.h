@@ -118,6 +118,5 @@ struct proc {
 
   // for fcfs scheduling
   //Specification 2
-
   int ctime;
 };

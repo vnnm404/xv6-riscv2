@@ -472,6 +472,7 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
+    #ifdef RR
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
@@ -488,6 +489,40 @@ scheduler(void)
       }
       release(&p->lock);
     }
+    #endif
+
+    #ifdef FCFS
+    p = 0;
+    struct proc *fp;
+    for(fp = proc; fp < &proc[NPROC]; fp++) {
+      acquire(&fp->lock);
+      if (fp->state != RUNNABLE) {
+        release(&fp->lock);
+        continue;
+      }
+      if (p == 0) {
+        p = fp;
+      } else {
+        if (p->ctime > fp->ctime)
+          p = fp;
+      }
+      release(&fp->lock);
+    }
+
+    if (p) {
+      acquire(&p->lock);
+      if (p->state == RUNNABLE) {
+        // printf("Starting: %d %d\n", p->pid, p->state == RUNNABLE);
+        p->state = RUNNING;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+
+        c->proc = 0;
+        // printf("Started!\n");
+      }
+      release(&p->lock);
+    }
+    #endif
   }
 }
 
