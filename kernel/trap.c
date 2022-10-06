@@ -140,6 +140,10 @@ void usertrap(void)
   if (which_dev == 2)
     yield();
   #endif
+  #ifdef LOTTERY
+  if (which_dev == 2)
+    yield();
+  #endif
 
   usertrapret();
 }
@@ -216,6 +220,10 @@ void kerneltrap()
     yield();
   #endif
   #ifdef MLFQ
+  if (which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
+    yield();
+  #endif
+  #ifdef LOTTERY
   if (which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
     yield();
   #endif
