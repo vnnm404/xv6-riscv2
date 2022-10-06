@@ -116,7 +116,10 @@ struct proc {
   int alarmOn;
   struct trapframe * alarmContext;
 
-  // for fcfs scheduling
   //Specification 2
-  int ctime;
+  // for fcfs scheduling
+  uint ctime;
+
+  // for lottery scheduling
+  int tickets;
 };

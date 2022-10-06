@@ -28,6 +28,9 @@ int trace(int);
 int sigalarm(int interval, void (*handler)());
 int sigreturn(void);
 
+// Specification 2
+int settickets(int);
+
 // ulib.c
 int stat(const char*, struct stat*);
 char* strcpy(char*, const char*);

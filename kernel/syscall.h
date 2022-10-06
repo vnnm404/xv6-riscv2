@@ -22,6 +22,9 @@
 #define SYS_close  21
 
 // Specification 1
-#define SYS_trace  22
-#define SYS_sigalarm 23
-#define SYS_sigreturn 24
+#define SYS_trace      22
+#define SYS_sigalarm   23
+#define SYS_sigreturn  24
+
+// Specification 2
+#define SYS_settickets 25

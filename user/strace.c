@@ -6,6 +6,7 @@
 
 int
 main(int argc, char *argv[]) {
+  settickets(20);
   if (argc <= 2) {
     fprintf(2, "strace: insufficient arguments\n");
     exit(1);

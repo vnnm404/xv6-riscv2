@@ -6,6 +6,8 @@
 #include "proc.h"
 #include "defs.h"
 
+#include "random.c"
+
 struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
@@ -134,6 +136,7 @@ found:
 
   // Specification 2.  
   p->ctime = ticks; // 'ticks' is an inbuilt unit in xv6
+  p->tickets = 1;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -342,6 +345,10 @@ fork(void)
   // Specification 1
   np->smask = p->smask;
 
+  // Specification 2
+  // child process should get inherits its parents tickets
+  np->tickets = p->tickets;
+
   return pid;
 }
 
@@ -472,27 +479,19 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
+    p = 0;
     #ifdef RR
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
+        release(&p->lock);
+        break;
       }
       release(&p->lock);
     }
     #endif
 
     #ifdef FCFS
-    p = 0;
     struct proc *fp;
     for(fp = proc; fp < &proc[NPROC]; fp++) {
       acquire(&fp->lock);
@@ -507,7 +506,35 @@ scheduler(void)
           p = fp;
       }
       release(&fp->lock);
+    }    
+    #endif
+
+    #ifdef LOTTERY
+    int tot_tk = 0;
+    struct proc *fp;
+    for(fp = proc; fp < &proc[NPROC]; fp++) {
+      acquire(&fp->lock);
+      if (fp->state == RUNNABLE)
+        tot_tk += fp->tickets;
+      release(&fp->lock);
     }
+
+    int rv = rand((uint64)ticks);
+    int sv = 0;
+    for(fp = proc; fp < &proc[NPROC]; fp++) {
+      acquire(&fp->lock);
+      if (fp->state == RUNNABLE) {
+        int prob = (fp->tickets * RAND_MAX) / tot_tk;
+        if (sv <= rv && rv < sv + prob) {
+          p = fp;
+          release(&fp->lock);
+          break;
+        }
+        sv += prob;
+      }
+      release(&fp->lock);
+    }
+    #endif
 
     if (p) {
       acquire(&p->lock);
@@ -522,7 +549,6 @@ scheduler(void)
       }
       release(&p->lock);
     }
-    #endif
   }
 }
 

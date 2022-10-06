@@ -139,3 +139,14 @@ uint64 sys_sigreturn(void)
   // as sys_sigreturn is also a systemcall its return value will be stored in the a0 register
   return a0;
 }
+
+uint64 sys_settickets(void) {
+  struct proc *p;
+  int tk;
+
+  argint(0, &tk);
+  p = myproc();
+
+  p->tickets += tk;
+  return 0;
+}

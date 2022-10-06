@@ -105,6 +105,8 @@ extern uint64 sys_close(void);
 extern uint64 sys_trace(void);
 extern uint64 sys_sigalarm(void);
 extern uint64 sys_sigreturn(void);
+// Specification 2
+extern uint64 sys_settickets(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -131,8 +133,9 @@ static uint64 (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_trace]   sys_trace, //Specification 1
-[SYS_sigalarm]   sys_sigalarm,
-[SYS_sigreturn]  sys_sigreturn,
+[SYS_sigalarm]   sys_sigalarm, //Specification 1
+[SYS_sigreturn]  sys_sigreturn, //Specification 1
+[SYS_settickets] sys_settickets, // Specification 2
 };
 
 static char *syscall_names[] = {
@@ -158,8 +161,9 @@ static char *syscall_names[] = {
   [SYS_mkdir]   "mkdir",
   [SYS_close]   "close",
   [SYS_trace]   "trace", // Specification 1
-  [SYS_sigalarm]   "sigalarm",
-  [SYS_sigreturn]  "sigreturn",
+  [SYS_sigalarm]   "sigalarm", // Specification 1
+  [SYS_sigreturn]  "sigreturn", // Specification 1
+  [SYS_settickets] "settickets", // Specification 2
 };
 
 static int syscall_nargs[] = {
@@ -185,8 +189,9 @@ static int syscall_nargs[] = {
   [SYS_mkdir]   1,
   [SYS_close]   1,
   [SYS_trace]   1, // Specification 1
-  [SYS_sigalarm]   2,
-  [SYS_sigreturn]   0,
+  [SYS_sigalarm]     2, // Specification 1
+  [SYS_sigreturn]    0, // Specification 1
+  [SYS_settickets]   1, // Specification 2
 };
 
 void
