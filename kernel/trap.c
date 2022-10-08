@@ -27,6 +27,54 @@ void trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+// handle COW interrupt
+int handleCOW(pagetable_t pagetable, uint64 va) {
+  pte_t *pte;
+  uint64 pa;
+  uint flags;
+  char *mem;
+  
+  if (va >= MAXVA)
+    return 1;
+
+  va = PGROUNDDOWN(va);
+  pte = walk(pagetable, va, 0);
+  pa = PTE2PA(*pte);
+  flags = PTE_FLAGS(*pte);
+
+  if ((flags & PTE_COW) == 0 || pte == 0 || (flags & PTE_V) == 0 || (flags & PTE_U) == 0) {
+    return 1;
+  }
+
+  memref_lock();
+  memref_unlock_kalloc();
+  flags = (flags & (~PTE_COW)) | PTE_W;
+  int fq = memref_get((void*)pa);
+  // printf("Ref: %d\n", fq);
+  if (fq == 1) {
+    *pte = (*pte & (~PTE_COW)) | PTE_W;
+  } else {
+    if ((mem = kalloc()) == 0) {
+      memref_unlock();
+      return 1;
+    }
+
+    memmove((void*)mem, (void*)pa, PGSIZE);
+    uvmunmap(pagetable, va, 1, 0);
+    if (mappages(pagetable, va, PGSIZE, (uint64)mem, flags) != 0) {
+      kfree(mem);
+      memref_unlock();
+      return 1;
+    }
+
+    memref_set((void*)pa, fq - 1);
+  }
+  memref_lock_kalloc();
+  memref_unlock();
+
+  return 0;
+}
+
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -64,44 +112,16 @@ void usertrap(void)
 
     syscall();
   }
-
-  else if (r_scause() == 0xf) // 0xf is a pagefault trap (like writing to read only PTEs)
+  else if (r_scause() == 15) // 0xf is a pagefault trap (like writing to read only PTEs)
   {
     // Specification 3(COW)
     // we now allocate this page to the child process
     // and we then set the PTE_W bit
-    uint64 err_va, n_va;
-    pte_t *pte;
-    uint flags;
-    char *mem;
-
-    err_va = r_stval();
-    n_va = PGROUNDDOWN(err_va); // nearest page
-    pte = walk(p->pagetable, n_va, 0);
-    flags = PTE_FLAGS(*pte);
-
-    if ((flags & PTE_V) && (flags & PTE_COW) && (flags & PTE_U)) {
-      if (get_access((void*)err_va) == 1) {
-        *pte = (*pte & (~PTE_COW)) | PTE_W;
-      } else {
-        flags |= PTE_W;
-        flags &= ~PTE_COW;
-      
-        if((mem = kalloc()) == 0)
-          exit(-1);
-        memmove(mem, (char *)PTE2PA(*pte), PGSIZE);
-
-        uvmunmap(p->pagetable, n_va, 1, 1);
-        // decrement access
-        if (mappages(p->pagetable, n_va, PGSIZE, (uint64)mem, flags) != 0) {
-          exit(-1);
-        }
-      }
-    } else {
+    uint64 va = r_stval();
+    if (handleCOW(p->pagetable, va)) {
       setkilled(p);
     }
   }
-
   else if ((which_dev = devintr()) != 0)
   {
     // ok

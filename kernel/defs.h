@@ -60,9 +60,12 @@ void            ramdiskintr(void);
 void            ramdiskrw(struct buf*);
 
 // kalloc.c
-int             get_access(void*);
-void            inc_access(void*);
-void            dec_access(void*);
+void            memref_lock_kalloc();
+void            memref_unlock_kalloc();
+void            memref_lock();
+void            memref_unlock();
+int             memref_get(void*);
+void            memref_set(void*, int);
 void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);

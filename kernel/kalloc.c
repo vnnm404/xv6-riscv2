@@ -9,8 +9,7 @@
 #include "riscv.h"
 #include "defs.h"
 
-#define MAXPA   (1 << 15)
-int access_count[MAXPA];
+#define fn(X) ((uint64)X - KERNBASE) / PGSIZE
 
 void freerange(void *pa_start, void *pa_end);
 
@@ -26,22 +25,44 @@ struct {
   struct run *freelist;
 } kmem;
 
-int pa_ind(void *pa) {
-  return PGROUNDDOWN((uint64)pa) / PGSIZE;
-}
-
-void inc_access(void *addr) {
-  acquire(&kmem.lock);
-  access_count[pa_ind(addr)]++;
-  release(&kmem.lock);
-}
+struct {
+  struct spinlock lock;
+  int fr[fn(PHYSTOP) + 1];
+  char lock_kalloc;
+} memref;
 
 void
 kinit()
 {
+  initlock(&memref.lock, "memref");
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
-  memset(access_count, 0, MAXPA);
+  memref.lock_kalloc = 1;
+  memset((void*)memref.fr, 0, fn(PHYSTOP) + 1);
+}
+
+void memref_lock() {
+  acquire(&memref.lock);
+}
+
+void memref_unlock() {
+  release(&memref.lock);
+}
+
+int memref_get(void *pa) {
+  return memref.fr[fn(pa)];
+}
+
+void memref_set(void *pa, int fq) {
+  memref.fr[fn(pa)] = fq;
+}
+
+void memref_lock_kalloc() {
+  memref.lock_kalloc = 1;
+}
+
+void memref_unlock_kalloc() {
+  memref.lock_kalloc = 0;
 }
 
 void
@@ -65,6 +86,16 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
+  memref_lock();
+  if (memref.fr[fn(pa)] > 1) {
+    memref.fr[fn(pa)]--;
+    memref_unlock();
+    return;
+  }
+
+  memref.fr[fn(pa)] = 0;
+  memref_unlock();
+
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
@@ -73,21 +104,6 @@ kfree(void *pa)
   acquire(&kmem.lock);
   r->next = kmem.freelist;
   kmem.freelist = r;
-  release(&kmem.lock);
-}
-
-// S3(COW)
-void dec_access(void *addr) {
-  acquire(&kmem.lock);
-  int ind = pa_ind(addr);
-  if (access_count[ind] == 0) {
-    panic("dec_access: already freed");
-  }
-  access_count[ind]--;
-  if (access_count[ind] == 0) {
-    printf("Should work\n");
-    kfree(addr);
-  }
   release(&kmem.lock);
 }
 
@@ -105,13 +121,16 @@ kalloc(void)
     kmem.freelist = r->next;
   release(&kmem.lock);
 
-  if(r)
+  if(r) {
+    if (memref.lock_kalloc) {
+      memref_lock();
+      memref.fr[fn(r)] = 1;
+      memref_unlock();
+    } else {
+      memref.fr[fn(r)] = 1;
+    }
+
     memset((char*)r, 5, PGSIZE); // fill with junk
-
-  inc_access(r);
+  }
   return (void*)r;
-}
-
-int get_access(void *addr) {
-  return access_count[pa_ind(addr)];
 }

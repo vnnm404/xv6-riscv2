@@ -131,7 +131,7 @@ uint64 sys_sigreturn(void)
 
   memmove(p->trapframe, p->alarmContext, PGSIZE);
   int a0 = p->alarmContext->a0;
-  dec_access(p->alarmContext);
+  kfree(p->alarmContext);
   p->alarmOn = 0;
   p->nticks = 0;
   p->alarmContext = 0;

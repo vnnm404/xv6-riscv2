@@ -185,7 +185,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
       panic("uvmunmap: not a leaf");
     if(do_free){
       uint64 pa = PTE2PA(*pte);
-      dec_access((void*)pa);
+      kfree((void*)pa);
     }
     *pte = 0;
   }
@@ -240,7 +240,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
     }
     memset(mem, 0, PGSIZE);
     if(mappages(pagetable, a, PGSIZE, (uint64)mem, PTE_R|PTE_U|xperm) != 0){
-      dec_access(mem);
+      kfree(mem);
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
@@ -283,7 +283,7 @@ freewalk(pagetable_t pagetable)
       panic("freewalk: leaf");
     }
   }
-  dec_access((void*)pagetable);
+  kfree((void*)pagetable);
 }
 
 // Free user memory pages,
@@ -317,29 +317,19 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-
-    inc_access((void*)pa);
     // if((mem = kalloc()) == 0)
     //   goto err;
     // memmove(mem, (char*)pa, PGSIZE);
-    // if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-    //   dec_access(mem);
-    //   goto err;
-    // }
-    
-    /* S3(COW) */
-    // clear PTE_W (prevent writes to all blocks in this mapping)
-    flags &= ~PTE_W;
-    flags |= PTE_COW;
-    if (mappages(new, i, PGSIZE, pa, flags) != 0) {
+    *pte = (*pte & (~PTE_W)) | PTE_COW;
+    flags = (flags & (~PTE_W)) | PTE_COW;
+    if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
+      // kfree(mem);
       goto err;
     }
-
-    // remove old map for parent, remap but without PTE_W
-    uvmunmap(old, i, 1, 1);
-    if (mappages(old, i, PGSIZE, pa, flags) != 0) {
-      goto err;
-    }
+    memref_lock();
+    int fq = memref_get((void*)pa);
+    memref_set((void*)pa, fq + 1);
+    memref_unlock();
   }
   return 0;
 
@@ -360,6 +350,8 @@ uvmclear(pagetable_t pagetable, uint64 va)
     panic("uvmclear");
   *pte &= ~PTE_U;
 }
+
+extern int handleCOW(pagetable_t pagetable, uint64 va);
 
 // Copy from kernel to user.
 // Copy len bytes from src to virtual address dstva in a given page table.
