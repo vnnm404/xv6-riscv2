@@ -42,7 +42,7 @@ int handleCOW(pagetable_t pagetable, uint64 va) {
   pa = PTE2PA(*pte);
   flags = PTE_FLAGS(*pte);
 
-  if ((flags & PTE_COW) == 0 || pte == 0 || (flags & PTE_V) == 0 || (flags & PTE_U) == 0) {
+  if (va == 0 || (flags & PTE_COW) == 0 || pte == 0 || (flags & PTE_V) == 0 || (flags & PTE_U) == 0) {
     return 1;
   }
 
