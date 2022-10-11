@@ -598,6 +598,8 @@ scheduler(void)
   struct proc *p;
   struct proc *fp;
   struct cpu *c = mycpu();
+
+  (void)i; (void)j; (void)fp;
   
   c->proc = 0;
   for(;;){
@@ -736,7 +738,9 @@ scheduler(void)
     }
     #endif
 
+  #ifdef MLFQ
   schedule:
+  #endif
 
     if (p) {
       acquire(&p->lock);
