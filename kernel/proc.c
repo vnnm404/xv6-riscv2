@@ -716,6 +716,7 @@ scheduler(void)
           // printf("--=-=-=-=-=-=-=[UPDATE]-=-=-=-=-=-==--=\n");
           dequeue_proc(fp);
           fp->pr++;
+          fp->wticks = 0;
           queue_proc(fp);
         }
       }
@@ -729,6 +730,7 @@ scheduler(void)
           if (fp->state == RUNNABLE) {
             dequeue_proc(fp);
             p = fp;
+            p->wticks = 0;
             goto schedule;
           } else
             dequeue_proc(fp);
