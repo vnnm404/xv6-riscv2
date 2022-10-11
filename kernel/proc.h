@@ -80,6 +80,7 @@ struct trapframe {
 };
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+enum procpr { P0, P1, P2, P3, P4 };
 
 // Per-process state
 struct proc {
@@ -123,6 +124,7 @@ struct proc {
   // for lottery scheduling
   int tickets;
 
+
   // for PBS scheduling
   int rtime;
   int stime;
@@ -133,6 +135,12 @@ struct proc {
 
   // for waitx
   int etime;
+
+  // S2(MLFQ)
+  int rticks; // running ticks
+  int wticks; // wait ticks
+  enum procpr pr;
+
 };
 
 // Specification 2 

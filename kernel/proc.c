@@ -11,6 +11,7 @@
 struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
+struct proc *queue[NPR][NPROC];
 
 struct proc *initproc;
 
@@ -57,6 +58,7 @@ proc_mapstacks(pagetable_t kpgtbl)
 void
 procinit(void)
 {
+  int i, j;
   struct proc *p;
   
   initlock(&pid_lock, "nextpid");
@@ -65,6 +67,11 @@ procinit(void)
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
+  }
+  for(i = 0; i < NPR; i++) {
+    for (j = 0; j < NPROC; j++) {
+      queue[i][j] = 0;
+    }
   }
 }
 
@@ -139,8 +146,9 @@ found:
   p->state = USED;
   
   // Specification 1
-  p->nticks =0;
-  p->alarmOn =0;
+  p->smask = 0;
+  p->nticks = 0;
+  p->alarmOn = 0;
 
   // Specification 2 (Scheduling)  
   //fcfs
@@ -150,6 +158,7 @@ found:
   //lottery
   p->tickets = 1;
 
+
   // pbs
   p->rtime = 0;
   p->stime = 0;
@@ -157,6 +166,12 @@ found:
   p->niceness = 5;
   p->wtime = 0;
   p->sch_no = 0;
+
+
+  // S3(MLFQ)
+  p->rticks = 0;
+  p->wticks = 0;
+  p->pr = P0;
 
 
   // Allocate a trapframe page.
@@ -209,6 +224,12 @@ freeproc(struct proc *p)
   p->interval = 0;
   p->nticks =0;
   p->handler = 0;
+
+  // Specification 2
+  p->ctime = 0;
+  p->rticks = 0;
+  p->wticks = 0;
+  p->pr = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -483,6 +504,7 @@ wait(uint64 addr)
   }
 }
 
+
 int
 waitx(uint64 addr, uint* wtime, uint* rtime)
 {
@@ -531,6 +553,36 @@ waitx(uint64 addr, uint* wtime, uint* rtime)
     sleep(p, &wait_lock);  //DOC: wait-sleep
   }
 }
+void dequeue_proc(struct proc *p) {
+  int i, j;
+
+  for(i = 0; i < NPROC; i++) {
+    struct proc *fp = queue[p->pr][i];
+    if (fp && fp->pid == p->pid) {
+      for(j = i + 1; j < NPROC; j++)
+        queue[p->pr][j - 1] = queue[p->pr][j];
+      
+      break;
+    }
+  }
+}
+
+void queue_proc(struct proc *p) {
+  int i;
+
+  // clean_queue(p->pr);
+  for(i = 0; i < NPROC; i++) {
+    struct proc *fp = queue[p->pr][i];
+    if (fp && fp->pid == p->pid)
+      return;
+    
+    if (!fp) {
+      queue[p->pr][i] = p;
+      break;
+    }
+
+  }
+}
 
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -542,7 +594,9 @@ waitx(uint64 addr, uint* wtime, uint* rtime)
 void
 scheduler(void)
 {
+  int i, j;
   struct proc *p;
+  struct proc *fp;
   struct cpu *c = mycpu();
   
   c->proc = 0;
@@ -607,6 +661,7 @@ scheduler(void)
     }
     #endif
 
+
     #ifdef PBS
     struct proc *fp;
     int min_dp = 103;
@@ -639,6 +694,49 @@ scheduler(void)
       release(&fp->lock);
     }
     #endif
+
+
+    #ifdef MLFQ
+    for(fp = proc; fp < &proc[NPROC]; fp++) {
+      // if (fp->state == UNUSED || fp->queued)
+        // continue;
+      
+      if (fp->state == RUNNABLE) {
+        // printf("Queing: %d %d\n", fp->pid, fp->queued);
+        queue_proc(fp);
+      }
+    }
+
+    for(i = 1; i < NPR; i++) {
+      for(j = 0; j < NPROC; j++) {
+        fp = queue[i][j];
+        if (fp && fp->wticks >= 10) {
+          // printf("--=-=-=-=-=-=-=[UPDATE]-=-=-=-=-=-==--=\n");
+          dequeue_proc(fp);
+          fp->pr++;
+          queue_proc(fp);
+        }
+      }
+    }
+
+    p = 0;
+    for (i = 0; i < NPR; i++) {
+      for (j = 0; j < NPROC; j++) {
+        fp = queue[i][j];
+        if (fp) {
+          if (fp->state == RUNNABLE) {
+            dequeue_proc(fp);
+            p = fp;
+            goto schedule;
+          } else
+            dequeue_proc(fp);
+        } else
+          break;
+      }
+    }
+    #endif
+
+  schedule:
 
     if (p) {
       acquire(&p->lock);

@@ -10,6 +10,7 @@ struct spinlock tickslock;
 uint ticks;
 
 extern char trampoline[], uservec[], userret[];
+extern struct proc *queue[NPR][NPROC];
 
 // in kernelvec.S, calls kerneltrap().
 void kernelvec();
@@ -81,6 +82,7 @@ int handleCOW(pagetable_t pagetable, uint64 va) {
 //
 void usertrap(void)
 {
+  int i, j;
   int which_dev = 0;
 
   if ((r_sstatus() & SSTATUS_SPP) != 0)
@@ -154,6 +156,22 @@ void usertrap(void)
         p->trapframe->epc = p->handler;
       }
     }
+
+    // Specification 2 (MLFQ)
+    if (which_dev == 2) {
+      if (p->state == RUNNING)
+        p->rticks++;
+      
+      for(i = 0; i < NPR; i++) {
+        for(j = 0; j < NPROC; j++) {
+          struct proc *fp = queue[i][j];
+          if (fp && fp->state == RUNNABLE) {
+            // printf("------------![USER]!------------");
+            fp->wticks++;
+          }
+        }
+      }
+    }
   }
   else
   {
@@ -171,8 +189,27 @@ void usertrap(void)
     yield();
   #endif
   #ifdef MLFQ
-  if (which_dev == 2)
-    yield();
+  if(which_dev == 2) {
+    if (p->rticks == (1 << p->pr)) {
+      // printf("int %d\n", p->rticks);
+      p->rticks = 0;
+      if (p->pr != P4)
+        p->pr++;
+      yield();
+    }
+
+    // check if higher priority process exists
+    for(i = 0; i < p->pr; i++) {
+      for(j = 0; j < NPROC; j++)
+        if (!queue[i][j])
+          break;
+        
+      if (j) {
+        // higher priority process available (don't reset rticks)
+        yield();
+      }
+    }
+  }
   #endif
   #ifdef LOTTERY
   if (which_dev == 2)
@@ -231,6 +268,7 @@ void usertrapret(void)
 // on whatever the current kernel stack is.
 void kerneltrap()
 {
+  int i, j;
   int which_dev = 0;
   uint64 sepc = r_sepc();
   uint64 sstatus = r_sstatus();
@@ -254,6 +292,17 @@ void kerneltrap()
     yield();
   #endif
   #ifdef MLFQ
+  if (which_dev == 2) {
+    for(i = 0; i < NPR; i++) {
+      for(j = 0; j < NPROC; j++) {
+        struct proc *fp = queue[i][j];
+        if (fp && fp->state == RUNNABLE) {
+          // printf("------------![KERNEL]!------------");
+          fp->wticks++;
+        }
+      }
+    }
+  }
   if (which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
     yield();
   #endif
