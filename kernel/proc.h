@@ -122,4 +122,20 @@ struct proc {
 
   // for lottery scheduling
   int tickets;
+
+  // for PBS scheduling
+  int rtime;
+  int stime;
+  int staticP;
+  int niceness;
+  int wtime;
+  int sch_no;
+
+  // for waitx
+  int etime;
 };
+
+// Specification 2 
+// pbs
+extern struct proc proc[NPROC];
+

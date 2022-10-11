@@ -125,6 +125,20 @@ void usertrap(void)
   else if ((which_dev = devintr()) != 0)
   {
     // ok
+
+    if (which_dev == 2) {
+      struct proc *fp;
+      for(fp = proc; fp < &proc[NPROC]; fp++) {
+        acquire(&fp->lock);
+
+        //if (fp->state == SLEEPING) fp->stime +=1 ;
+
+        if (fp->state == RUNNING) fp->rtime +=1;
+
+        release(&fp->lock);
+      }
+    }
+    
     // Specification 1
     if (which_dev == 2 && p->alarmOn == 0)
     {

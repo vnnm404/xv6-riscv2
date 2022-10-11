@@ -28,6 +28,14 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
+int max(int A, int B){
+  return A>B ? A:B;
+}
+
+int min(int A, int B){
+  return A>B ? B:A;
+}
+
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
@@ -134,9 +142,22 @@ found:
   p->nticks =0;
   p->alarmOn =0;
 
-  // Specification 2.  
+  // Specification 2 (Scheduling)  
+  //fcfs
   p->ctime = ticks; // 'ticks' is an inbuilt unit in xv6
+  p->etime = 0;
+
+  //lottery
   p->tickets = 1;
+
+  // pbs
+  p->rtime = 0;
+  p->stime = 0;
+  p->staticP = 60;
+  p->niceness = 5;
+  p->wtime = 0;
+  p->sch_no = 0;
+
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -314,7 +335,8 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
-
+  //Specification 2 (PBS)
+  np->staticP = p->staticP;
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 
@@ -461,6 +483,55 @@ wait(uint64 addr)
   }
 }
 
+int
+waitx(uint64 addr, uint* wtime, uint* rtime)
+{
+  struct proc *np;
+  int havekids, pid;
+  struct proc *p = myproc();
+
+  acquire(&wait_lock);
+
+  for(;;){
+    // Scan through table looking for exited children.
+    havekids = 0;
+    for(np = proc; np < &proc[NPROC]; np++){
+      if(np->parent == p){
+        // make sure the child isn't still in exit() or swtch().
+        acquire(&np->lock);
+
+        havekids = 1;
+        if(np->state == ZOMBIE){
+          // Found one.
+          pid = np->pid;
+          *rtime = np->rtime;
+          *wtime = np->etime - np->ctime - np->rtime;
+          if(addr != 0 && copyout(p->pagetable, addr, (char *)&np->xstate,
+                                  sizeof(np->xstate)) < 0) {
+            release(&np->lock);
+            release(&wait_lock);
+            return -1;
+          }
+          freeproc(np);
+          release(&np->lock);
+          release(&wait_lock);
+          return pid;
+        }
+        release(&np->lock);
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || p->killed){
+      release(&wait_lock);
+      return -1;
+    }
+    
+    // Wait for a child to exit.
+    sleep(p, &wait_lock);  //DOC: wait-sleep
+  }
+}
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -536,11 +607,51 @@ scheduler(void)
     }
     #endif
 
+    #ifdef PBS
+    struct proc *fp;
+    int min_dp = 103;
+    for(fp = proc; fp < &proc[NPROC]; fp++) {
+      acquire(&fp->lock);
+      if (fp->state == RUNNABLE){
+        int sleep = fp->wtime - fp->stime;
+        if(!sleep && !fp->rtime){
+          fp->niceness = 5;
+        }
+        else {
+          fp->niceness = (int)((sleep/(sleep + fp->rtime)) * 10);
+        }
+        int dp = max(0,min(fp->staticP - fp->niceness + 5 , 100));
+        if(dp < min_dp){
+          p = fp;
+          min_dp = dp;
+        }
+        else if(dp == min_dp){
+          if(fp->sch_no < p->sch_no){
+            p = fp;
+          }
+          else if(fp->sch_no == p->sch_no){
+            if(fp->ctime < p->ctime){
+              p = fp;
+            }
+          }
+        }
+      }
+      release(&fp->lock);
+    }
+    #endif
+
     if (p) {
       acquire(&p->lock);
       if (p->state == RUNNABLE) {
         // printf("Starting: %d %d\n", p->pid, p->state == RUNNABLE);
         p->state = RUNNING;
+        #ifdef PBS
+        p->rtime = 0;
+        p->stime =0;
+        p->niceness = 5;
+        p->wtime =0;
+        p->sch_no += 1;
+        #endif
         c->proc = p;
         swtch(&c->context, &p->context);
 
@@ -631,6 +742,7 @@ sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
+  p->stime = ticks;
 
   sched();
 
@@ -654,6 +766,7 @@ wakeup(void *chan)
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
+        p->wtime = ticks;
       }
       release(&p->lock);
     }

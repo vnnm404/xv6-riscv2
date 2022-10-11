@@ -150,3 +150,47 @@ uint64 sys_settickets(void) {
   p->tickets += tk;
   return 0;
 }
+
+uint64 sys_set_priority(void){
+  struct proc *p;
+  int sp,pid;
+
+  argint(0,&sp);
+  argint(1,&pid);
+
+  for(p=proc;p<&proc[NPROC];p++){
+    acquire(&p->lock);
+    if(p->pid==pid){
+      int old_sp = p->staticP;
+      p->staticP = sp;
+      p->niceness = 5;
+      p->rtime =0;
+      p->stime =0;
+      p->wtime =0;
+      release(&p->lock);
+      if(old_sp > sp){
+        yield();
+      }
+      return old_sp;
+    }
+    release(&p->lock);
+  }
+  return -1;
+}
+
+uint64
+sys_waitx(void)
+{
+  uint64 addr, addr1, addr2;
+  uint wtime, rtime;
+  argaddr(0, &addr);
+  argaddr(1, &addr1); // user virtual memory
+  argaddr(2, &addr2);
+  int ret = waitx(addr, &wtime, &rtime);
+  struct proc* p = myproc();
+  if (copyout(p->pagetable, addr1,(char*)&wtime, sizeof(int)) < 0)
+    return -1;
+  if (copyout(p->pagetable, addr2,(char*)&rtime, sizeof(int)) < 0)
+    return -1;
+  return ret;
+}
