@@ -85,6 +85,9 @@ void usertrap(void)
   int i, j;
   int which_dev = 0;
 
+  (void)i;
+  (void)j;
+
   if ((r_sstatus() & SSTATUS_SPP) != 0)
     panic("usertrap: not from user mode");
 
@@ -273,6 +276,9 @@ void kerneltrap()
   uint64 sepc = r_sepc();
   uint64 sstatus = r_sstatus();
   uint64 scause = r_scause();
+
+  (void)i;
+  (void)j;
 
   if ((sstatus & SSTATUS_SPP) == 0)
     panic("kerneltrap: not from supervisor mode");
