@@ -599,7 +599,11 @@ scheduler(void)
   struct proc *fp;
   struct cpu *c = mycpu();
 
-  (void)i; (void)j; (void)fp;
+
+  (void)i;
+  (void)j;
+  (void)fp;
+
   
   c->proc = 0;
   for(;;){
@@ -740,9 +744,10 @@ scheduler(void)
     }
     #endif
 
-  #ifdef MLFQ
+
+#ifdef MLFQ
   schedule:
-  #endif
+#endif
 
     if (p) {
       acquire(&p->lock);
@@ -846,6 +851,7 @@ sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
+  // Specification 2 PBS
   p->stime = ticks;
 
   sched();
@@ -870,6 +876,7 @@ wakeup(void *chan)
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
+        // Specification 2
         p->wtime = ticks;
       }
       release(&p->lock);
