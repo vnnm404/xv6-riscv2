@@ -599,9 +599,11 @@ scheduler(void)
   struct proc *fp;
   struct cpu *c = mycpu();
 
+
   (void)i;
   (void)j;
   (void)fp;
+
   
   c->proc = 0;
   for(;;){
@@ -717,7 +719,8 @@ scheduler(void)
         if (fp && fp->wticks >= 10) {
           // printf("--=-=-=-=-=-=-=[UPDATE]-=-=-=-=-=-==--=\n");
           dequeue_proc(fp);
-          fp->pr++;
+          fp->pr--;
+          fp->wticks = 0;
           queue_proc(fp);
         }
       }
@@ -731,6 +734,7 @@ scheduler(void)
           if (fp->state == RUNNABLE) {
             dequeue_proc(fp);
             p = fp;
+            p->wticks = 0;
             goto schedule;
           } else
             dequeue_proc(fp);
@@ -740,9 +744,11 @@ scheduler(void)
     }
     #endif
 
+
 #ifdef MLFQ
   schedule:
 #endif
+
     if (p) {
       acquire(&p->lock);
       if (p->state == RUNNABLE) {
@@ -750,9 +756,9 @@ scheduler(void)
         p->state = RUNNING;
         #ifdef PBS
         p->rtime = 0;
-        p->stime =0;
+        p->stime = 0;
         p->niceness = 5;
-        p->wtime =0;
+        p->wtime = 0;
         p->sch_no += 1;
         #endif
         c->proc = p;

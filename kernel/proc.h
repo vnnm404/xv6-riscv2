@@ -140,7 +140,6 @@ struct proc {
   int rticks; // running ticks
   int wticks; // wait ticks
   enum procpr pr;
-
 };
 
 // Specification 2 
