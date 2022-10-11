@@ -136,8 +136,6 @@ void usertrap(void)
       for(fp = proc; fp < &proc[NPROC]; fp++) {
         acquire(&fp->lock);
 
-        //if (fp->state == SLEEPING) fp->stime +=1 ;
-
         if (fp->state == RUNNING) fp->rtime +=1;
 
         release(&fp->lock);
