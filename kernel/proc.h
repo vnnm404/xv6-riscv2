@@ -124,8 +124,26 @@ struct proc {
   // for lottery scheduling
   int tickets;
 
+
+  // for PBS scheduling
+  int rtime;
+  int stime;
+  int staticP;
+  int niceness;
+  int wtime;
+  int sch_no;
+
+  // for waitx
+  int etime;
+
   // S2(MLFQ)
   int rticks; // running ticks
   int wticks; // wait ticks
   enum procpr pr;
+
 };
+
+// Specification 2 
+// pbs
+extern struct proc proc[NPROC];
+

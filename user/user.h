@@ -30,6 +30,8 @@ int sigreturn(void);
 
 // Specification 2
 int settickets(int);
+int set_priority(int, int);
+int waitx(int*, int*, int*);
 
 // ulib.c
 int stat(const char*, struct stat*);
