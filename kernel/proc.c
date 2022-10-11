@@ -715,7 +715,7 @@ scheduler(void)
         if (fp && fp->wticks >= 10) {
           // printf("--=-=-=-=-=-=-=[UPDATE]-=-=-=-=-=-==--=\n");
           dequeue_proc(fp);
-          fp->pr++;
+          fp->pr--;
           fp->wticks = 0;
           queue_proc(fp);
         }
@@ -751,9 +751,9 @@ scheduler(void)
         p->state = RUNNING;
         #ifdef PBS
         p->rtime = 0;
-        p->stime =0;
+        p->stime = 0;
         p->niceness = 5;
-        p->wtime =0;
+        p->wtime = 0;
         p->sch_no += 1;
         #endif
         c->proc = p;
