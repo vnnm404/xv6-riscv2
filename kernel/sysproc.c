@@ -164,7 +164,7 @@ uint64 sys_set_priority(void){
       int old_sp = p->staticP;
       p->staticP = sp;
       p->niceness = 5;
-      p->rtime =0;
+      p->pbs_rtime =0;
       p->stime =0;
       p->wtime =0;
       release(&p->lock);

@@ -160,6 +160,7 @@ found:
 
 
   // pbs
+  p->pbs_rtime = 0;
   p->rtime = 0;
   p->stime = 0;
   p->staticP = 60;
@@ -447,6 +448,7 @@ exit(int status)
 
   p->xstate = status;
   p->state = ZOMBIE;
+  p->etime = ticks;
 
   release(&wait_lock);
 
@@ -511,7 +513,6 @@ waitx(uint64 addr, uint* wtime, uint* rtime)
   struct proc *np;
   int havekids, pid;
   struct proc *p = myproc();
-
   acquire(&wait_lock);
 
   for(;;){
@@ -553,6 +554,20 @@ waitx(uint64 addr, uint* wtime, uint* rtime)
     sleep(p, &wait_lock);  //DOC: wait-sleep
   }
 }
+
+void
+ update_time()
+ {
+   struct proc* p;
+   for (p = proc; p < &proc[NPROC]; p++) {
+     acquire(&p->lock);
+     if (p->state == RUNNING) {
+       p->rtime++;
+     }
+     release(&p->lock); 
+   }
+ }
+
 void dequeue_proc(struct proc *p) {
   int i, j;
 
@@ -675,11 +690,11 @@ scheduler(void)
       acquire(&fp->lock);
       if (fp->state == RUNNABLE){
         int sleep = fp->wtime - fp->stime;
-        if(!sleep && !fp->rtime){
+        if(!sleep && !fp->pbs_rtime){
           fp->niceness = 5;
         }
         else {
-          fp->niceness = (int)((sleep/(sleep + fp->rtime)) * 10);
+          fp->niceness = (int)((sleep/(sleep + fp->pbs_rtime)) * 10);
         }
         int dp = max(0,min(fp->staticP - fp->niceness + 5 , 100));
         if(dp < min_dp){
@@ -755,7 +770,7 @@ scheduler(void)
         // printf("Starting: %d %d\n", p->pid, p->state == RUNNABLE);
         p->state = RUNNING;
         #ifdef PBS
-        p->rtime = 0;
+        p->pbs_rtime = 0;
         p->stime = 0;
         p->niceness = 5;
         p->wtime = 0;
