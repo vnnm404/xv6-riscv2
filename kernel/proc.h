@@ -141,6 +141,7 @@ struct proc {
   int rticks; // running ticks
   int wticks; // wait ticks
   enum procpr pr;
+  int graph[200]; // ticks for graphing (mlfq analysis)
 };
 
 // Specification 2 

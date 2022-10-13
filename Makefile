@@ -146,6 +146,7 @@ UPROGS=\
 	$U/_setpriority\
 	$U/_schedulertest\
 	$U/_time\
+	$U/_vnnm\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

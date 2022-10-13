@@ -195,7 +195,7 @@ void usertrap(void)
   #ifdef MLFQ
   if(which_dev == 2) {
     if (p->rticks == (1 << p->pr)) {
-      // printf("int %d\n", p->rticks);
+      printf("inc %d\n", p->pr);
       p->rticks = 0;
       if (p->pr != P4)
         p->pr++;
