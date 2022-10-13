@@ -473,6 +473,253 @@ struct {
 } memref;
 ```
 
+`char lock_kalloc` is added to determine whether `kalloc` should acquire the lock or not to edit `memref`, this is used solely for implementation and dealing with locks and is not related to the workings of cow.
+
+We modify `kfree` to decrement a reference and free the page if the number of references is 0.
+
+```c
+void
+kfree(void *pa)
+{
+  struct run *r;
+
+  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
+    panic("kfree");
+
+  memref_lock();
+  if (memref.fr[fn(pa)] > 1) {
+    memref.fr[fn(pa)]--;
+    memref_unlock();
+    return;
+  }
+
+  memref.fr[fn(pa)] = 0;
+  memref_unlock();
+	...
+}
+```
+
+Similarly, kalloc was modified to set the number of references to 1.
+
+```c
+void *
+kalloc(void)
+{
+  struct run *r;
+
+  acquire(&kmem.lock);
+  r = kmem.freelist;
+  if(r)
+    kmem.freelist = r->next;
+  release(&kmem.lock);
+
+  if(r) {
+    if (memref.lock_kalloc) {
+      memref_lock();
+      memref.fr[fn(r)] = 1;
+      memref_unlock();
+    } else {
+      memref.fr[fn(r)] = 1;
+    }
+
+    memset((char*)r, 5, PGSIZE); // fill with junk
+  }
+  return (void*)r;
+}
+```
+Auxiliary functions were added to use memref in trap.c
+
+```c
+void            memref_lock_kalloc();
+void            memref_unlock_kalloc();
+void            memref_lock();
+void            memref_unlock();
+int             memref_get(void*);
+void            memref_set(void*, int);
+```
+
+Now to detect a page fault, we check if r_scause is 0x0000f in usertrap(). Store faults set r_scause to 0x0000f and the address at which the fault occurred is stored in r_stval(). The pagetable and virtual address is sent a function to handle the fault if it is due to a COW page.
+
+```c
+void usertrap(void) {
+	else if (r_scause() == 15) {
+    // Specification 3(COW)
+    // we now allocate this page to the child process
+    // and we then set the PTE_W bit
+    uint64 va = r_stval();
+    if (handleCOW(p->pagetable, va)) {
+      setkilled(p);
+    }
+  }
+}
+```
+
+Before we explain what handleCOW() does, we will first talk about how a parent and child share the same memory, fork uses uvmcopy() to copy its memory to the child, this function is changed to,
+
+```c
+int
+uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
+{
+  pte_t *pte;
+  uint64 pa, i;
+  uint flags;
+  // char *mem;
+
+  for(i = 0; i < sz; i += PGSIZE){
+    if((pte = walk(old, i, 0)) == 0)
+      panic("uvmcopy: pte should exist");
+    if((*pte & PTE_V) == 0)
+      panic("uvmcopy: page not present");
+    pa = PTE2PA(*pte);
+    flags = PTE_FLAGS(*pte);
+    // if((mem = kalloc()) == 0)
+    //   goto err;
+    // memmove(mem, (char*)pa, PGSIZE);
+    *pte = (*pte & (~PTE_W)) | PTE_COW;
+    flags = (flags & (~PTE_W)) | PTE_COW;
+    if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
+      // kfree(mem);
+      goto err;
+    }
+    memref_lock();
+    int fq = memref_get((void*)pa);
+    memref_set((void*)pa, fq + 1);
+    memref_unlock();
+  }
+  return 0;
+
+ err:
+  uvmunmap(new, 0, i / PGSIZE, 1);
+  return -1;
+}
+```
+
+We remove the write bit and set a cow bit in bit 9. Bits 8 and 9 are software reserved bits provided by RISC.
+
+```c
+*pte = (*pte & (~PTE_W)) | PTE_COW;
+flags = (flags & (~PTE_W)) | PTE_COW;
+```
+
+We then map the child processes memory to pa, the parents page.
+
+```c
+if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
+	// kfree(mem);
+	goto err;
+}
+```
+
+Now, we can explain handleCOW().
+
+```c
+int handleCOW(pagetable_t pagetable, uint64 va) {
+  pte_t *pte;
+  uint64 pa;
+  uint flags;
+  char *mem;
+  
+  if (va >= MAXVA)
+    return 1;
+
+  va = PGROUNDDOWN(va);
+  pte = walk(pagetable, va, 0);
+  pa = PTE2PA(*pte);
+  flags = PTE_FLAGS(*pte);
+
+  if (va == 0 || (flags & PTE_COW) == 0 || pte == 0 ||
+		 (flags & PTE_V) == 0 || (flags & PTE_U) == 0)
+	{
+    return 1;
+  }
+
+  memref_lock();
+  memref_unlock_kalloc();
+  flags = (flags & (~PTE_COW)) | PTE_W;
+  int fq = memref_get((void*)pa);
+  // printf("Ref: %d\n", fq);
+  if (fq == 1) {
+    *pte = (*pte & (~PTE_COW)) | PTE_W;
+  } else {
+    if ((mem = kalloc()) == 0) {
+      memref_unlock();
+      return 1;
+    }
+
+    memmove((void*)mem, (void*)pa, PGSIZE);
+    uvmunmap(pagetable, va, 1, 0);
+    if (mappages(pagetable, va, PGSIZE, (uint64)mem, flags) != 0) {
+      kfree(mem);
+      memref_unlock();
+      return 1;
+    }
+
+    memref_set((void*)pa, fq - 1);
+  }
+  memref_lock_kalloc();
+  memref_unlock();
+
+  return 0;
+}
+```
+
+We first obtain the PTE associated with the faulting address. We then error check and return 1 if any errors are found or if the mapping wasn’t a COW mapping.
+
+We then freeze `memref` and allocate the page newly. If the number of references to the page is 1, then we can simply change the flags of this page.
+
+```c
+*pte = (*pte & (~PTE_COW)) | PTE_W;
+```
+
+Otherwise, we need to allocate it memory and map the old pages to this new memory but with write permissions and removing the COW bit.
+
+```c
+flags = (flags & (~PTE_COW)) | PTE_W;
+...
+{
+	if ((mem = kalloc()) == 0) {
+	  memref_unlock();
+	  return 1;
+	}
+	
+	memmove((void*)mem, (void*)pa, PGSIZE);
+	uvmunmap(pagetable, va, 1, 0);
+	if (mappages(pagetable, va, PGSIZE, (uint64)mem, flags) != 0) {
+	  kfree(mem);
+	  memref_unlock();
+	  return 1;
+	}
+	...
+}
+```
+
+If the number of references wasn’t one, we then decrement the reference count to the old page.
+
+```c
+memref_set((void*)pa, fq - 1);
+```
+
+## Report
+
+#### Round Robin Scheduling
+
+Average run time - 11 ticks
+Average wait time - 107 ticks
+
+#### FCFS
+
+Average run time - 13 ticks
+Average wait time - 105 ticks
+
+#### PBS
+
+Average run time - 13 ticks
+Average wait time - 105 ticks
+
+#### Lottery
+Average run time - 8 ticks
+Average wait time - 112 ticks
+
 
 
 
