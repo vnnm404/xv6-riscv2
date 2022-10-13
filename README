@@ -261,7 +261,7 @@ uint64 sys_set_priority(void){
       int old_sp = p->staticP;
       p->staticP = sp;
       p->niceness = 5;
-      p->rtime =0;
+      p->pbs_rtime =0;
       p->stime =0;
       p->wtime =0;
       release(&p->lock);
@@ -276,7 +276,7 @@ uint64 sys_set_priority(void){
 }
 ```
 
-6 attributes have been added to `struct proc` - `rtime`,`stime`,`wtime`,`niceness`,`staticP`, and `sch_no`
+6 attributes have been added to `struct proc` - `pbs_rtime`,`stime`,`wtime`,`niceness`,`staticP`, and `sch_no`
 
 Here we must calculate running time and the sleeping time in order to calculate niceness which is calculated by using the formula
 
@@ -290,7 +290,7 @@ if (which_dev == 2) {
       for(fp = proc; fp < &proc[NPROC]; fp++) {
         acquire(&fp->lock);
 
-        if (fp->state == RUNNING) fp->rtime +=1;
+        if (fp->state == RUNNING) fp->pbs_rtime +=1;
 
         release(&fp->lock);
       }
@@ -310,11 +310,11 @@ struct proc *fp;
       acquire(&fp->lock);
       if (fp->state == RUNNABLE){
         int sleep = fp->wtime - fp->stime;
-        if(!sleep && !fp->rtime){
+        if(!sleep && !fp->pbs_rtime){
           fp->niceness = 5;
         }
         else {
-          fp->niceness = (int)((sleep/(sleep + fp->rtime)) * 10);
+          fp->niceness = (int)((sleep/(sleep + fp->pbs_rtime)) * 10);
         }
         int dp = max(0,min(fp->staticP - fp->niceness + 5 , 100));
         if(dp < min_dp){
@@ -452,6 +452,26 @@ for (i = 0; i < NPR; i++) {
 }
 ```
 The selected process `p` is then run by switching context and changing the state of `p`.
+
+## Copy On Write
+
+To implement copy on write, we modify the functions fork uses to prevent the copy of memory and instead map both the processes pagetables to point to the same memory.
+
+To identify when either process tries to write to the memory, we remove write permissions from the mapped memory, then when a process tries to write to it a page fault is raised and then we can detect this and allocate the page properly with write permissions.
+
+This makes knowing when to call `kfree` on a memory block much harder as many processes can refer to the same process, the way we dealt with this is by only freeing the block when no process refers to the block. To do this, we modify `kalloc` and `kfree` and store the number of processes referring to a particular page.
+
+*Code Breakdown*
+
+The following struct was added to kalloc.c to keep track of the number of processes referring to a particular page.
+
+```c
+struct {
+  struct spinlock lock;
+  int fr[fn(PHYSTOP) + 1];
+  char lock_kalloc;
+} memref;
+```
 
 
 

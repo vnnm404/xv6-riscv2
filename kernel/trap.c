@@ -132,19 +132,18 @@ void usertrap(void)
   else if ((which_dev = devintr()) != 0)
   {
     // ok
-
+    #ifdef PBS
     if (which_dev == 2) {
       struct proc *fp;
       for(fp = proc; fp < &proc[NPROC]; fp++) {
         acquire(&fp->lock);
 
-        //if (fp->state == SLEEPING) fp->stime +=1 ;
-
-        if (fp->state == RUNNING) fp->rtime +=1;
+        if (fp->state == RUNNING) fp->pbs_rtime +=1;
 
         release(&fp->lock);
       }
     }
+    #endif
     
     // Specification 1
     if (which_dev == 2 && p->alarmOn == 0)
@@ -329,8 +328,9 @@ void kerneltrap()
 
 void clockintr()
 {
-  acquire(&tickslock);
+  acquire(&tickslock);    
   ticks++;
+  update_time();
   wakeup(&ticks);
   release(&tickslock);
 }

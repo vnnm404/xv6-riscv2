@@ -126,7 +126,8 @@ struct proc {
 
 
   // for PBS scheduling
-  int rtime;
+  int pbs_rtime;
+  uint rtime;
   int stime;
   int staticP;
   int niceness;
@@ -134,7 +135,7 @@ struct proc {
   int sch_no;
 
   // for waitx
-  int etime;
+  uint etime;
 
   // S2(MLFQ)
   int rticks; // running ticks
