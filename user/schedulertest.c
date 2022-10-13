@@ -27,6 +27,9 @@ int main() {
 #ifdef PBS
         set_priority(60-IO+n, pid); // Will only matter for PBS, set lower priority for IO bound processes 
 #endif
+#ifdef LOTTERY
+        settickets(60-IO+n); // Will only matter for PBS, set lower priority for IO bound processes 
+#endif
       }
   }
   for(;n > 0; n--) {
