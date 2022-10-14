@@ -3,7 +3,7 @@
 #include "kernel/fcntl.h"
 
 #define SEC17         100000000000000000L
-#define SEC10         1000000000000L
+#define SEC12         1000000000000L
 #define SEC9          1000000000L
 
 void f0() {
