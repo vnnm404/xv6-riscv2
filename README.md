@@ -706,20 +706,24 @@ memref_set((void*)pa, fq - 1);
 #### Round Robin Scheduling
 
 Average run time - 11 ticks
+
 Average wait time - 107 ticks
 
 #### FCFS
 
 Average run time - 13 ticks
+
 Average wait time - 105 ticks
 
 #### PBS
 
 Average run time - 13 ticks
+
 Average wait time - 105 ticks
 
 #### Lottery
 Average run time - 8 ticks
+
 Average wait time - 112 ticks
 
 ## MLFQ Analysis
