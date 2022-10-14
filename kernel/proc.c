@@ -731,7 +731,7 @@ scheduler(void)
     for(i = 1; i < NPR; i++) {
       for(j = 0; j < NPROC; j++) {
         fp = queue[i][j];
-        if (fp && fp->wticks >= 10) {
+        if (fp && fp->wticks >= 30) {
           // printf("--=-=-=-=-=-=-=[UPDATE]-=-=-=-=-=-==--=\n");
           dequeue_proc(fp);
           fp->pr--;
