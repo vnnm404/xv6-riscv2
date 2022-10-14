@@ -139,6 +139,7 @@ void usertrap(void)
         acquire(&fp->lock);
 
         if (fp->state == RUNNING) fp->pbs_rtime +=1;
+        else if(fp->state == SLEEPING) fp->stime +=1;
 
         release(&fp->lock);
       }
