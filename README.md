@@ -722,7 +722,7 @@ Average wait time - 112 ticks
 
 ## MLFQ Analysis
 
-![alt text](images/MLFQ_plot.png)
+![alt text](Graph/Figure_2.png)
 
 
 
