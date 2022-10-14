@@ -453,6 +453,8 @@ for (i = 0; i < NPR; i++) {
 ```
 The selected process `p` is then run by switching context and changing the state of `p`.
 
+If a process voluntarily relinquishes control(by doing IO, for example), then it is placed back in the same priority queue. A process can exploit this by yielding voluntarily right before it is done with its time slice and does perform computation without being penalized for using too much CPU time.
+
 ## Copy On Write
 
 To implement copy on write, we modify the functions fork uses to prevent the copy of memory and instead map both the processes pagetables to point to the same memory.
