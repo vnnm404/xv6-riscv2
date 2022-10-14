@@ -728,6 +728,7 @@ Average wait time - 112 ticks
 
 #### MLFQ
 Average run time = 12 ticks
+
 Average wait time = 148 ticks
 
 ## MLFQ Analysis
