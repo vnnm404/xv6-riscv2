@@ -689,7 +689,7 @@ scheduler(void)
     for(fp = proc; fp < &proc[NPROC]; fp++) {
       acquire(&fp->lock);
       if (fp->state == RUNNABLE){
-        int sleep = fp->wtime - fp->stime;
+        int sleep = fp->stime;
         if(!sleep && !fp->pbs_rtime){
           fp->niceness = 5;
         }
@@ -867,7 +867,7 @@ sleep(void *chan, struct spinlock *lk)
   p->chan = chan;
   p->state = SLEEPING;
   // Specification 2 PBS
-  p->stime = ticks;
+  //p->stime = ticks;
 
   sched();
 
@@ -998,7 +998,7 @@ procdump(void)
     else
       state = "???";
     // Specification 1
-    printf("%d %s %s %d", p->pid, state, p->name, p->smask);
+    printf("%d %s %s %d %d %d", p->pid, state, p->name, p->smask, p->stime,p->wtime);
     printf("\n");
   }
 }
