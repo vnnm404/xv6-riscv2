@@ -144,23 +144,6 @@ void usertrap(void)
       }
     }
     #endif
-
-    if (which_dev == 2) {
-      printf("Tick %d\n", ticks);
-      // for(i = 0; i < NPR; i++) {
-      //   for(j = 0; j < NPROC; j++) {
-      //     struct proc *fp = queue[i][j];
-      //     if (fp && fp->pid > 2) {
-      //       printf("%d:%d\n", fp->pid, fp->pr);
-      //     }
-      //   }
-      // }
-      struct proc *fp;
-      for(fp = proc; fp < &proc[NPROC]; fp++) {
-        if (fp->pid > 2)
-          printf("p%d:%d\n", fp->pid, fp->pr);
-      }
-    }
     
     // Specification 1
     if (which_dev == 2 && p->alarmOn == 0)
