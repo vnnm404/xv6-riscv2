@@ -689,7 +689,7 @@ scheduler(void)
     for(fp = proc; fp < &proc[NPROC]; fp++) {
       acquire(&fp->lock);
       if (fp->state == RUNNABLE){
-        int sleep = fp->stime;
+        int sleep = fp->wtime - fp->stime;
         if(!sleep && !fp->pbs_rtime){
           fp->niceness = 5;
         }
@@ -867,7 +867,7 @@ sleep(void *chan, struct spinlock *lk)
   p->chan = chan;
   p->state = SLEEPING;
   // Specification 2 PBS
-  //p->stime = ticks;
+  p->stime = ticks;
 
   sched();
 
